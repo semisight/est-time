@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import
+import argparse
+
+from git import *
+
+parser = argparse.ArgumentParser(description=
+    """Estimate time worked on a git repository.""")
+
+parser.add_argument('path', help='Path to the git repository.')
+
+# optional args
+parser.add_argument('-t', '--time', help=
+    'specify the maximum amount of time in between commits in one consecutive '
+    'run')
+
+args = parser.parse_args()
+
+if args.time:
+    tmax = args.time
+else:
+    tmax = 2400
+
+# now do git-y stuff!
+
+repo    = Repo(args.path)
+times   = [x.authored_date for x in repo.iter_commits()]
+dtime   = [x-y for x, y in zip(times[:-1], times[1:])
+    if x-y < tmax and x-y != 0]
+
+average = sum(dtime)/len(dtime)
+
+print 'Approximate time spent working is:'
+print str(average * (len(dtime) + 1) / 60) + ' minutes.'
