@@ -1,35 +1,70 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-import argparse
+from __future__ import absolute_import, division
+import argparse, itertools, datetime
 
 from git import *
 
-parser = argparse.ArgumentParser(description=
-    """Estimate time worked on a git repository.""")
+def group_by(seq, pred):
+    # rv - an array of arrays
+    rv = [[]]
 
-parser.add_argument('path', help='Path to the git repository.')
+    for t in seq:
+        # if pred is false, we start a new group in rv; otherwise add to last.
+        if pred(t):
+            rv[-1].append(t)
+        else:
+            rv.append([])
 
-# optional args
-parser.add_argument('-t', '--time', help=
-    'specify the maximum amount of time in between commits in one consecutive '
-    'run')
+    return rv
 
-args = parser.parse_args()
+def git_process(path, tmax):
+    repo = Repo(path)
 
-if args.time:
-    tmax = args.time
-else:
-    tmax = 2400
+    # get the times for each commit...
+    times = [x.authored_date for x in repo.iter_commits()]
+    # ...and get the differentials beteween them. Exclude 0 values.
+    dtime = [x-y for x, y in zip(times[:-1], times[1:]) if x-y != 0]
 
-# now do git-y stuff!
+    groups = group_by(dtime, lambda x: x < tmax)
 
-repo    = Repo(args.path)
-times   = [x.authored_date for x in repo.iter_commits()]
-dtime   = [x-y for x, y in zip(times[:-1], times[1:])
-    if x-y < tmax and x-y != 0]
+    # We also want the average of all values in the arrays. This will give us
+    # the average length of time that one worked on a commit for this project.
+    # There are 'better' ways to do this but this is the most explicit/least
+    # clever (PEP8) way, so I'll use it.
+    values = list(itertools.chain(*groups))
+    average = sum(values)/len(values)
 
-average = sum(dtime)/len(dtime)
+    Ttotal = 0
 
-print 'Approximate time spent working is:'
-print str(average * (len(dtime) + 1) / 60) + ' minutes.'
+    for g in groups:
+        Ttotal += sum(g) + average
+
+    return Ttotal
+
+def main():
+    parser = argparse.ArgumentParser(description=
+        """Estimate time worked on a git repository.""")
+
+    parser.add_argument('path', help='Path to the git repository.')
+
+    # optional args
+    parser.add_argument('-t', '--time', help=
+        'specify the maximum amount of time in between commits in one consecutive '
+        'run')
+
+    args = parser.parse_args()
+
+    if args.time is not None:
+        tmax = int(args.time)
+    else:
+        # default is 40min
+        tmax = 2400
+
+    time = git_process(args.path, tmax)
+
+    print 'Time spent on repo is approximately:'
+    print str(datetime.timedelta(seconds=time))
+
+if __name__ == '__main__':
+    main()
