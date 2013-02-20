@@ -5,6 +5,8 @@ import argparse, itertools, datetime
 
 from git import *
 
+# I feel like this is a bit of clojure-in-python; I'm sorry. It's not exactly
+# analogous to clojure's group-by, but it seemed like a good name for this fn.
 def group_by(seq, pred):
     # rv - an array of arrays
     rv = [[]]
@@ -18,7 +20,7 @@ def group_by(seq, pred):
 
     return rv
 
-def git_process(path, tmax):
+def git_process(path, max_delta):
     repo = Repo(path)
 
     # get the times for each commit...
@@ -26,7 +28,7 @@ def git_process(path, tmax):
     # ...and get the differentials beteween them. Exclude 0 values.
     dtime = [x-y for x, y in zip(times[:-1], times[1:]) if x-y != 0]
 
-    groups = group_by(dtime, lambda x: x < tmax)
+    groups = group_by(dtime, lambda x: x < max_delta)
 
     # We also want the average of all values in the arrays. This will give us
     # the average length of time that one worked on a commit for this project.
@@ -58,7 +60,7 @@ def main():
     if args.time is not None:
         tmax = int(args.time)
     else:
-        # default is 40min
+        # default is 40 min or 
         tmax = 2400
 
     time = git_process(args.path, tmax)
